@@ -137,7 +137,7 @@ export default class App extends React.Component {
 
   renderLogged() {
     return (
-      <BrowserRouter>
+      <BrowserRouter basename={process.env.PUBLIC_URL}>
                 
                 <Route exact path={"/:id"} render={() => {
                     const id = window.location.pathname.replace("/", "")
@@ -169,7 +169,7 @@ export default class App extends React.Component {
  
   renderNoLogged(){
     return (
-        <BrowserRouter>
+        <BrowserRouter basename={process.env.PUBLIC_URL}>
             <Route exact path={"/:id"} render={() => {
                     const id = window.location.pathname.replace("/", "")
                     return (
