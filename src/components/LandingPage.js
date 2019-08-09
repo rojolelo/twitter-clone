@@ -41,9 +41,9 @@ class LandingPage extends React.Component {
                         <form onSubmit={this.logIn}>
                         <input className="login-input" ref={this.emailRef} type="text" placeholder="Email or Username"/>
                         <input className="login-input" ref={this.passwordRef} type="password" placeholder="Password"/>
-                        <button className="login-btn" type="submit" >Login</button>
-                        <p className="login-forgot">Forgot your password?</p>
+                        <button className="login-btn" type="submit" >Login</button>                        
                         </form>
+                        <p className="login-forgot">Forgot your password?</p>
                     </div>
 
 

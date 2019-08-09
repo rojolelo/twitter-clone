@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import firebase from  "firebase";
 import SearchContainer from './SearchContainer';
 import {Link} from "react-router-dom";
+import NotificationsContainer from './Notifications/NotificationsContainer';
 
 ;
 let usersArray = [];
@@ -12,7 +13,10 @@ class Header extends Component {
     state = { 
         search: "",
         searchResult : [],
-        profilepic: "https://cdn.britannica.com/67/197567-131-1645A26E.jpg"
+        profilepic: "https://cdn.britannica.com/67/197567-131-1645A26E.jpg",
+        notifications: [],
+        unseenNotifications: 0,
+        showNotifications: false,
      }
     refSearch = React.createRef();
 
@@ -21,14 +25,22 @@ class Header extends Component {
     LogIn = this.LogIn.bind(this)    
 
     LogIn() {
-        window.location.replace("/")        
+        window.location.replace("/twitter-clone/")        
     }
 
     componentDidMount(){
+
+        
+        
+
+        
+
+        
         firebase.auth().onAuthStateChanged((user) => {        
             if (user) { 
               const email = firebase.auth().currentUser.email;
               const usersDB = firebase.database().ref().child("users");
+                let loggedUserId = false;
               let profilepic = "";
 
               usersDB.once("value", data =>{
@@ -37,13 +49,46 @@ class Header extends Component {
 
                   for (let i = 0; i < keys.length; i++) {
                       if (users[keys[i]]["email"] === email) {
+                            loggedUserId = users[keys[i]]["id"];
+                            
                           if (!!users[keys[i]]["profilepic"]) {
-                               profilepic= users[keys[i]]["profilepic"];
+                               profilepic= users[keys[i]]["profilepic"];                               
                                break;                                
                           }
                       }
                   }                    
               }).then(() => {
+
+
+                ////////NOTIFICATIONS
+
+                if (loggedUserId){
+                    usersDB.child(loggedUserId).child("notifications").on("value", snapshot =>{
+                        
+                        const newNotifications = snapshot.val()
+                        let unseenNotifications = 0;
+
+
+                        if (!!newNotifications){
+                         for (let i = 0; i < newNotifications.length; i++){
+                            if (newNotifications[i][2] === 0){
+                                unseenNotifications++;
+                            }
+                         }
+                        } else {
+                            return null;
+                        }
+
+                        this.setState({ 
+                            
+                            unseenNotifications,
+                            notifications: snapshot.val()
+                        })
+                    })
+                }
+
+                //////////////////
+
                   if (profilepic.length > 0){
                       this.setState({
                           profilepic,
@@ -104,7 +149,14 @@ class Header extends Component {
         this.props.toggleSettings();
     }
 
+    toggleNotifications = () => {
+        this.setState({
+            showNotifications: !this.state.showNotifications
+        })
+    }
+
     render() { 
+
         
         if (this.state.searchResult.length > 0) this.state.searchResult = getUnique(this.state.searchResult, "id");
         var next = false;
@@ -121,6 +173,20 @@ class Header extends Component {
             return unique
         }
 
+        ///////////////////////////////////////////////////////////////
+
+        let notificationsToShow;
+
+        if (!!this.state.notifications) {
+            const orderedNotifications = this.state.notifications.sort((a,b) => {
+                var timeA = new Date(a[1]).getTime()
+                var timeB = new Date(b[1]).getTime()
+                  return timeB - timeA;
+           })
+
+           notificationsToShow = orderedNotifications.slice(0,9)
+        }
+
         
 ////////////////////////////////////////////////////////////////////////
        
@@ -131,8 +197,10 @@ class Header extends Component {
                     <Link to="/">
                         <h3 className="header-button">Home</h3>
                     </Link>
-                    <h3 className="header-button">Notifications</h3>
-                    <h3 className="header-button">Messages</h3>
+                    <h3 className="header-button" onClick={this.toggleNotifications}>Notifications</h3>
+                    {this.state.unseenNotifications > 0 ? <span className="header-notification-number">{this.state.unseenNotifications}</span> : null}
+                    {this.state.showNotifications ? <NotificationsContainer notifications={notificationsToShow}/> : null}
+                    <h3 className="header-button disabled-button" >Messages</h3>
                     </div>
                     <div className="header-mid">
                     <h3 id="header-logo">Logo</h3>    

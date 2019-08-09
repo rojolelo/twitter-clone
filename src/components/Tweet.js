@@ -5,7 +5,7 @@
 
 import React, { Component } from 'react';
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
-import {faComment as faReply, faRetweet, faHeart, faHamburger, faHeartBroken} from "@fortawesome/free-solid-svg-icons";
+import {faComment as faReply, faRetweet, faHeart, faTrash} from "@fortawesome/free-solid-svg-icons";
 import {Link} from "react-router-dom"
 import firebase from "firebase";
 import { thisExpression } from '@babel/types';
@@ -29,17 +29,36 @@ import Swal from "sweetalert2";
         likedByLogged: false,
         showRetweetedBy: false,
         matchingRetweeted: "",
+        loggedUser: "0",
+        deleted: false
     }
 
-
+    
     componentDidMount(){
         const {name, user, message, likes, retweets, retweetedBy, date, tweetId, likesNumber, retweetedByNumber, showRetweetedBy, matchingRetweeted } = this.props.tweet;
         let profilepic = false;
+        var newMessage = [];     
         
-        const tweetsDB = firebase.database().ref().child("tweets").child(tweetId).child("likes");
+
+        
+        //MENTIONED USERS IN THE MESSAGE
+        const mentionRegex = /@\w+/g;
+        var mentionedUsers = message.match(mentionRegex);
+     /*    for (let i = 0; i < mentionedUsers.length; i++){
+            mentionedUsers[i] = mentionedUsers[i].replace("@", "");
+            mentionedUsers[i] = [mentionedUsers[i], 0];
+        } */
+        // the number inside of mentioned users array determines if the users exists.
+
+        const approvedUsers = {};
+
+        //////////////////////////
+        
+        const tweetLikesDB = firebase.database().ref().child("tweets").child(tweetId).child("likes");
         let email;
         const usersDB = firebase.database().ref().child("users");
 
+        //CHECK IF LOGGED
         if (!!firebase.auth().currentUser){
             email = firebase.auth().currentUser.email
         }
@@ -54,7 +73,7 @@ import Swal from "sweetalert2";
         let likedByLogged = false;
 
         
-
+        // TIME AGO TO SHOW
         if        (timeAgo < 61) {
             showTime = `${Math.floor(timeAgo)} seconds ago`
         } else if (timeAgo < 3600) {
@@ -88,13 +107,15 @@ import Swal from "sweetalert2";
             const keys = Object.keys(users);
             let count= 0;
 
+            //  GET LOGGED USER ID IN ORDER TO CHECK LIKED
             for (let i = 0; i < keys.length; i++){
-                if (count === 2) break;
+                // if (count === 2) break;
                 if (email === users[keys[i]]["email"]) {
                     loggedUser = users[keys[i]]["id"];
                     count++;
                 }
 
+            //GET TWEETER USER TO GET PROFILEPIC
                 if (user === users[keys[i]]["id"]) {
                     if (!!users[keys[i]]["profilepic"]) {
                         profilepic = users[keys[i]]["profilepic"];
@@ -104,9 +125,38 @@ import Swal from "sweetalert2";
                         count++;
                     }
                 }
+
+            //CREATE PROPERTY IF USER IS FOUND - SO IT CAN BE CHECKED IF USER EXISTS.
+                if (!!mentionedUsers) {
+                    for (let j = 0; j < mentionedUsers.length; j++) {
+                        if (mentionedUsers[j].replace("@","") == users[keys[i]]["id"]){
+                            approvedUsers[mentionedUsers[j].replace("@","")] = 1
+                        }
+                    }
+                }
             }
+
+            // PENDANT: SPLIT THEN <FRAGMENT> THE STRING WITH HTML TO SHOW IN REACT
+            var splittedMessage = message.split(" ");
+            
+                  
+            for (let i = 0; i < splittedMessage.length; i++) {
+                if (splittedMessage[i][0] == "@" && approvedUsers.hasOwnProperty(splittedMessage[i].replace("@",""))) {
+                        newMessage.push(<React.Fragment><Link to={splittedMessage[i].replace("@", "")} ><span className="mention-user">{splittedMessage[i]}</span></Link></React.Fragment>)
+                        newMessage.push(" ")
+                } else {
+                    newMessage.push(splittedMessage[i])
+                    newMessage.push(" ")
+                }                
+            }
+
+
+
+
+
+
         }).then(x => {
-            tweetsDB.once("value", data=>{
+            tweetLikesDB.once("value", data=>{
                 const likes = data.val();
     
                 if (!likes) {
@@ -120,7 +170,23 @@ import Swal from "sweetalert2";
                 }
             }).then(x => {
                 this.setState({
-                    name, user, message, likes, retweets, retweetedBy, date, showTime, tweetId, likedByLogged, likesNumber, retweetedByNumber, showRetweetedBy, matchingRetweeted, profilepic
+                    name, 
+                    user, 
+                    message : newMessage, 
+                    likes, 
+                    retweets, 
+                    retweetedBy, 
+                    date, 
+                    showTime, 
+                    tweetId, 
+                    likedByLogged, 
+                    likesNumber, 
+                    retweetedByNumber, 
+                    showRetweetedBy, 
+                    matchingRetweeted, 
+                    profilepic, 
+                    loggedUser,
+                    updated: true
                 })
             })
         })
@@ -138,11 +204,13 @@ import Swal from "sweetalert2";
         }
 
 
-        const tweetsDB = firebase.database().ref().child("tweets").child(this.state.tweetId).child("likes");
+        const tweetLikesDB = firebase.database().ref().child("tweets").child(this.state.tweetId).child("likes");
         const usersDB = firebase.database().ref().child("users");
 
         let loggedUser = "";
         let likes = [];
+        let userNotifications = [];
+        let newNotification = [];
 
         if (!Boolean(email))  return null;
 
@@ -150,28 +218,57 @@ import Swal from "sweetalert2";
             const users = data.val();
             const keys = Object.keys(users);
 
+            
+
             for (let i = 0; i < keys.length; i++){
                 if (email === users[keys[i]]["email"]) {
                     loggedUser = users[keys[i]]["id"];
-                    break;
+                    newNotification[0] = users[keys[i]]["id"];
+                }
+
+                if (this.state.user === users[keys[i]]["id"]) {
+                    userNotifications = users[keys[i]]["notifications"]
                 }
             }
-        })
 
-        tweetsDB.once("value", data => {
-            likes = data.val()
-            if (!likes) {
-                likes = [loggedUser];
+            newNotification[1] = new Date().toISOString();
+            newNotification[2] = 0;
+            newNotification[3] = "like";
+            newNotification[4] = this.state.tweetId;
+
+            // newNotification = [user, date, 0, like, twID]
+
+            if (!userNotifications) {
+                userNotifications = [newNotification]
             } else {
-                likes.push(loggedUser);
+                userNotifications.push(newNotification)
             }
-        }).then(x =>{
-            tweetsDB.set(likes);
+           
+        }).then(() => {
+            tweetLikesDB.once("value", data => {
+                likes = data.val()
+                if (!likes) {
+                    likes = [loggedUser];
+                } else {
+                    likes.push(loggedUser);
+                }
+            }).then(x =>{
+                tweetLikesDB.set(likes);
 
-            this.setState({
-                likedByLogged: true,
-                likesNumber: this.state.likesNumber+1})
+                //SEND NOTIFICATION ONLY IF USER IS DIFFERENT.
+                // OBJECTIVE: NOT SELF NOTIFICATIONS.
+                if (newNotification[0] !== this.state.user){
+                    usersDB.child(this.state.user).child("notifications").set(userNotifications);
+                }
+
+                this.setState({
+                    likedByLogged: true,
+                    likesNumber: this.state.likesNumber+1})
+            })
         })
+
+        
+
 
 
     }
@@ -185,7 +282,10 @@ import Swal from "sweetalert2";
             return null;
         }
 
-        const tweetsDB = firebase.database().ref().child("tweets").child(this.state.tweetId).child("likes");
+        let userNotifications = [];
+        let newNotification = [];
+
+        const tweetLikesDB = firebase.database().ref().child("tweets").child(this.state.tweetId).child("likes");
         const usersDB = firebase.database().ref().child("users");
 
         let loggedUser = "";
@@ -198,29 +298,52 @@ import Swal from "sweetalert2";
             for (let i = 0; i < keys.length; i++){
                 if (email === users[keys[i]]["email"]) {
                     loggedUser = users[keys[i]]["id"];
-                    break;
+                }
+
+                //GET DISLIKED TWEET USER NOTIFICATIONS
+                if (this.state.user === users[keys[i]]["id"]){
+                    userNotifications = users[keys[i]]["notifications"];
                 }
             }
+
+            /////DELETE LIKE NOTIFICATION
+            if (!userNotifications){
+                userNotifications = [];
+            } else if (userNotifications.length === 1) {
+                userNotifications = []
+            } else {
+                userNotifications = userNotifications.filter(notification => {
+                    return !(notification[0] === loggedUser && notification[4] === this.state.tweetId)
+                })
+            }
+
+            if (loggedUser !== this.state.user) {
+            usersDB.child(this.state.user).child("notifications").set(userNotifications)
+            }
+            //////////////////////////////
+
+        }).then(() => {
+
+            tweetLikesDB.once("value", data => {
+                likes = data.val()
+                if (likes.length === 1) {
+                    likes = [];
+                } else {
+                    likes = likes.filter(userid => {
+                        return userid !== loggedUser
+                    });
+                }
+            }).then(x =>{
+                tweetLikesDB.set(likes)
+                this.setState({
+                    likedByLogged: false,
+                    likesNumber: this.state.likesNumber-1
+                })
+            })
+
         })
 
-        tweetsDB.once("value", data => {
-            likes = data.val()
-            if (likes.length === 1) {
-                likes = [];
-            } else {
-                likes = likes.filter(userid => {
-                    console.log(userid !== loggedUser)
-                    return userid !== loggedUser
-                });
-            }
-        }).then(x =>{
-            console.log(likes)
-            tweetsDB.set(likes)
-            this.setState({
-                likedByLogged: false,
-                likesNumber: this.state.likesNumber-1
-            })
-        })
+        
 
 
     }
@@ -235,10 +358,13 @@ import Swal from "sweetalert2";
             return null;
         }
         
-const usersDB = firebase.database().ref().child("users");
-        const tweetsDB = firebase.database().ref().child("tweets").child(this.state.tweetId).child("retweetedBy");
+        const usersDB = firebase.database().ref().child("users");
+        const tweetRetweetedDB = firebase.database().ref().child("tweets").child(this.state.tweetId).child("retweetedBy");
         
         let loggedUser = "";
+
+        let userNotifications = [];
+        let newNotification = [];
 
 
         Swal.fire({
@@ -254,33 +380,51 @@ const usersDB = firebase.database().ref().child("users");
                 usersDB.once("value", data =>{
                     const users = data.val();
                     const keys = Object.keys(users);
+                    let count = 0;
         
                     for (let i = 0; i < keys.length; i++){
+                        if (count === 2) break;
                         if (users[keys[i]]["email"] === email) {
                             loggedUser = users[keys[i]]["id"];
-                            break;
+                            newNotification[0] = users[keys[i]]["id"];
+                            count++
+                        }
+
+                        if (users[keys[i]]["id"] === this.state.user) {
+                            userNotifications = users[keys[i]]["notifications"];
+                            count++
                         }
                     }
+
+                    newNotification[1] = new Date().toISOString();
+                    newNotification[2] = 0;
+                    newNotification[3] = "retweet";
+                    newNotification[4] = this.state.tweetId;
+
+                    // newNotification = [user, date, 0, like, twID]
+
+                    if (!userNotifications) {
+                        userNotifications = [newNotification]
+                    } else {
+                        userNotifications.push(newNotification)
+                    }
+
         
                     
                 }).then(x =>{
-                    tweetsDB.once("value", data =>{
+                    tweetRetweetedDB.once("value", data =>{
                         let retweetedBy = data.val()
                         const retweetDate = new Date().toISOString();
                         const newRetweet = [loggedUser, retweetDate];
-                        /* let newArray = [];
-                        
-                        for (let i = 0; i < keys.length; i++){
-                            newArray.push(retweetedBy[keys[i]])
-                        } */
-
+                     
                         if (!retweetedBy) {
                             retweetedBy = [newRetweet];
                         } else {
                             retweetedBy.push(newRetweet);
                         }
         
-                        tweetsDB.set(retweetedBy);
+                        tweetRetweetedDB.set(retweetedBy);
+                        usersDB.child(this.state.user).child("notifications").set(userNotifications);
         
                     }).then(x=>{
                         Swal.fire(
@@ -305,7 +449,58 @@ const usersDB = firebase.database().ref().child("users");
 
     }
 
+    deleteTweet = () =>{
+        const usersDB = firebase.database().ref().child("users");
+        const tweetsDB = firebase.database().ref().child("tweets");
+        let sameUser = false;
+
+        Swal.fire({
+            title: 'Are you sure?',
+            text: "You won't be able to revert this",
+            type: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Yes, delete it!'
+          }).then((result) => {
+            if (result.value) {
+                usersDB.once("value", data => {
+                    const users = data.val();
+                    const keys = Object.keys(users);
+        
+                    for (let i = 0; i < keys.length; i++){
+                        if (this.state.loggedUser === users[keys[i]]["id"]) {
+                            sameUser = true;
+                            break;
+                        }
+                    }
+        
+                    if (sameUser == false) return null;
+        
+                    //THIS DELETES TWEET.
+                    tweetsDB.child(this.state.tweetId).set(null);
+        
+                }).then( () => {
+                    this.setState({
+                        deleted:true
+                    })
+                    Swal.fire(
+                        'Deleted!',
+                        'Your tweet has been deleted.',
+                        'success'
+                      )
+                })
+            }
+          })
+
+        
+
+        
+    }
+
      render(){   
+
+        if (this.state.deleted) return null;
 
         let image;
 
@@ -343,7 +538,7 @@ const usersDB = firebase.database().ref().child("users");
 
                         <div className="tweet-mid">
                             <div className="tweet-mid-message">
-                                {this.state.message}
+                                {!!this.state.message.length ? this.state.message.map(word => word) : null}
                             </div>
                         </div>
 
@@ -360,7 +555,7 @@ const usersDB = firebase.database().ref().child("users");
                                 {this.state.likesNumber > 0 ? <span>{this.state.likesNumber}</span> : null}
                             </div>
                             <div className="tweet-bot-icon">
-                                <FontAwesomeIcon id="react-icon" icon={faHamburger}/>
+                                {this.state.loggedUser == this.state.user ? <FontAwesomeIcon id="react-icon" onClick={this.deleteTweet} icon={faTrash}/> : null}
                             </div>
                         </div>
                     </div>

@@ -30,15 +30,13 @@ class UserBoxInUserPage extends Component {
 
     componentDidMount(){
 
-        console.log("mounting")
-
         const usersDB = firebase.database().ref().child("users");
         const tweetsDB = firebase.database().ref().child("tweets");
         
         let email = "";
 
         let name = "",
-           id = window.location.pathname.replace("/", ""),
+           id = window.location.pathname.replace("/twitter-clone/", ""),
            following = "",
            followers = "",
            tweetCount = 0,
@@ -136,7 +134,6 @@ class UserBoxInUserPage extends Component {
 
                         })
                     } else {
-                        console.log("no user logged", name, id, following, followers, tweetCount, followingButton)
                         this.setState({
                             name, id, following, followers, tweetCount, followingButton, profilepic, coverpic
                          })
@@ -149,6 +146,9 @@ class UserBoxInUserPage extends Component {
     follow = () => {
         const usersDB = firebase.database().ref().child("users");
         const email = firebase.auth().currentUser.email;
+
+        let userNotifications = [];
+        let newNotification = [];
 
         //ID of the userPage
         const id = this.state.id;
@@ -166,25 +166,46 @@ class UserBoxInUserPage extends Component {
 
                 //ADDING TO FOLLOWING
                 if (users[keys[i]]["email"] === email) {
-                    console.log(users[keys[i]])
                     following = users[keys[i]]["following"]
                     followingUser = users[keys[i]]["id"];
 
-                    if (typeof(following) === "undefined") {
-                        following = [id];
-                    } else {
-                        following.push(id);
-                    }
+                    //Add the follower ID to the notifications
+                    newNotification[0] = users[keys[i]]["id"];
+                }
+
+                //GET NOTIFICATIONS OF FOLLOWED
+                if (id === users[keys[i]]["id"]) {
+                    userNotifications = users[keys[i]]["notifications"]
                 }
             }
 
-            console.log(followingUser, following)
+            if (typeof(following) === "undefined") {
+                following = [id];
+            } else {
+                following.push(id);
+            }
 
+            //NOTIFICATIONS
+            newNotification[1] = new Date().toISOString();
+            newNotification[2] = 0;
+            newNotification[3] = "follow";
+            
+            if (!userNotifications){
+                userNotifications = [newNotification];
+            } else {
+                userNotifications.push(newNotification)
+            }
+
+            
+            usersDB.child(id).child("notifications").set(userNotifications);
+
+            /////////////////////////
+
+            
             for (let i = 0; i < keys.length; i++){
 
                 //ADDING TO FOLLOWERS
                 if (users[keys[i]]["id"] === id) {
-                    console.log(users[keys[i]])
                     followers = users[keys[i]]["followers"];
 
                     if (typeof(followers) === "undefined") {
@@ -195,13 +216,10 @@ class UserBoxInUserPage extends Component {
                 }                
             }
 
-            console.log(followers)
-            
             usersDB.child(id).child("followers").set(followers);
             usersDB.child(followingUser).child("following").set(following);
             
         }).then( x => {
-            console.log("following done")
             this.setState({
                 followingButton:1,
                 followers: this.state.followers +1
@@ -212,6 +230,8 @@ class UserBoxInUserPage extends Component {
     unfollow =() => {
         const usersDB = firebase.database().ref().child("users");
         const email = firebase.auth().currentUser.email;
+
+        let userNotifications = [];
 
         const id = this.state.id;
 
@@ -230,16 +250,36 @@ class UserBoxInUserPage extends Component {
                 if (users[keys[i]]["email"] === email) {
                     following = users[keys[i]]["following"]
                     followingUser = users[keys[i]]["id"];
-
-                    if (following.length === 1) {
-                        following = [];
-                    } else {
-                        following = following.filter(followedId => {
-                            return followedId !== id;
-                        })
-                    }
                 }
 
+                //GET UNFOLLOWED NOTIFICATIONS
+                if (id === users[keys[i]]["id"]){
+                    userNotifications = users[keys[i]]["notifications"];
+                }
+            }
+
+            /// DELETE FOLLOW NOTIFICATIONS
+                if (!userNotifications) {
+                    userNotifications = [];
+                } else if (userNotifications.length === 1) {
+                    userNotifications = []
+                } else {
+                    userNotifications = userNotifications.filter(notification => {
+                        return !(notification[0] === followingUser && notification[3] === "follow")
+                    })
+                }
+
+                usersDB.child(id).child("notifications").set(userNotifications)
+
+            ///////////////////////////////
+
+
+            if (following.length === 1) {
+                following = [];
+            } else {
+                following = following.filter(followedId => {
+                    return followedId !== id;
+                })
             }
 
             for (let i = 0; i < keys.length; i++){

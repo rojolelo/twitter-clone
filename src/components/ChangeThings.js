@@ -14,19 +14,47 @@ class ChangeThings extends Component {
      }
 
     profilePicHandler = (e) => {
+
          const profilePicFile = e.target.files[0]
 
-         this.setState({
-             profilePic: profilePicFile
-         })
+         if (profilePicFile.type === "image/png" || profilePicFile.type === "image/jpeg" ){
+
+            if (profilePicFile.size > 1000000) {
+               window.alert("Please use a lower size image for the profile pic")
+            } else {
+                 this.setState({
+                    profilePic: profilePicFile
+                })
+            }
+            
+         } else {
+             window.alert("Please use png or jpeg.")
+             e.target.value = null;
+         }
+
+         
      }
 
     coverPicHandler = (e) => {
         const coverPicFile = e.target.files[0]
 
-        this.setState({
-            coverPic: coverPicFile
-        })
+         if (coverPicFile.type === "image/png" || coverPicFile.type === "image/jpeg" ){
+            
+            if (coverPicFile.size > 1000000) {
+                window.alert("Please use a lower size image for the cover pic")
+            } else {
+                this.setState({
+                    coverPic: coverPicFile
+                })
+            }
+            
+            
+         } else {
+             window.alert("Please use png or jpeg.")
+             e.target.value = null;
+         }
+
+
     }
 
     //////////////////////////////////////////////////////////////////////////

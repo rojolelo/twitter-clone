@@ -90,7 +90,7 @@ export default class App extends React.Component {
   logOut(){
     firebase.auth().signOut().then(()=>{
       logged = false;
-      window.location.replace("/")
+      window.location.replace("/twitter-clone/")
       this.setState({})
   });
   }
@@ -138,9 +138,22 @@ export default class App extends React.Component {
   renderLogged() {
     return (
       <BrowserRouter basename={process.env.PUBLIC_URL}>
+
+                <Route exact path={"/tweet/:id"} render={() => {
+                  const id = window.location.pathname.replace("/tweet/", "")
+                    return (
+                      <React.Fragment>
+                        <Header logOut={this.logOut} toggleSettings={this.toggleSettings}/>
+
+                        {this.state.toggleSettings ? <ChangeThings toggleSettings={this.toggleSettings}/> : null}
+                    
+                        <LoggedLanding key={id}/>
+                      </React.Fragment>
+                  )
+                }}/>
                 
                 <Route exact path={"/:id"} render={() => {
-                    const id = window.location.pathname.replace("/", "")
+                    const id = window.location.pathname.replace("/twitter-clone/", "")
                     return (
                       <React.Fragment>
                         <Header logOut={this.logOut} key={id} toggleSettings={this.toggleSettings}/>
@@ -171,7 +184,7 @@ export default class App extends React.Component {
     return (
         <BrowserRouter basename={process.env.PUBLIC_URL}>
             <Route exact path={"/:id"} render={() => {
-                    const id = window.location.pathname.replace("/", "")
+                    const id = window.location.pathname.replace("/twitter-clone/", "")
                     return (
                       <React.Fragment key={id}>
                         <Header logOut={this.logOut}/>

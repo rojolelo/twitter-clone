@@ -7,11 +7,27 @@ class WriteTweet extends Component {
     state = { 
         tweet : "",
         profilepic: false,
+        mentions: [],
      }
     refTweetText = React.createRef();
     sendTweet=this.sendTweet.bind(this);
     writeTweet=this.writeTweet.bind(this);
     cleanState = this.cleanState.bind(this);
+
+    checkMention = () => {
+        const mentionRegex = /@\w+/g;
+
+        if (!this.state.tweet.match(mentionRegex)) return null;
+
+        let users = this.state.tweet.match(mentionRegex);
+
+        for (let i = 0; i < users.length; i++){
+            users[i] = users[i].replace("@", "");
+        }
+
+        return users;        
+        
+    }
 
     componentDidMount(){
         const usersDB = firebase.database().ref().child("users");
@@ -37,7 +53,6 @@ class WriteTweet extends Component {
             })
         })
     }
-
     cleanState(tweetData,tweetId){
         this.props.refreshRender(tweetData,tweetId);
         this.setState({
@@ -53,8 +68,14 @@ class WriteTweet extends Component {
 
     sendTweet(){
         const tweetMessage= this.state.tweet;
+        const mentionedUsers = this.checkMention();
+
+        let newNotification = [];
+        let usersNotifications = {};
+        let oldNotifications = [];        
 
         if (tweetMessage.length === 0) return null;
+
         
         const userEmail = firebase.auth().currentUser.email;
         const tweetsDB = firebase.database().ref().child("tweets")
@@ -70,7 +91,16 @@ class WriteTweet extends Component {
                         userData["name"] = users[keys[i]].firstName;
                         userData["userId"] = users[keys[i]].id;
                     }
+
+                    if (!!mentionedUsers) {
+                        for (let j = 0; j < mentionedUsers.length; j++) {
+                            if (mentionedUsers[j] === users[keys[i]]["id"]) {
+                                usersNotifications[users[keys[i]]["id"]] = users[keys[i]]["notifications"];
+                            }
+                        }
+                    }
                 }
+
             }).then(x => {
                 const tweetDate= new Date().toISOString();
                 const tweetData = {
@@ -83,6 +113,36 @@ class WriteTweet extends Component {
                 const tweetId = tweetsDB.push().key;
                 tweetData["tweetId"] = tweetId;
                 tweetsDB.child(tweetId).update(tweetData)
+
+                //NOTIFICATION TO MENTIONED USERS
+                if (!!mentionedUsers) {
+                    for (let i = 0; i < mentionedUsers.length; i++){
+                        newNotification[0] = mentionedUsers[i];
+                        newNotification[1] = new Date().toISOString()
+                        newNotification[2] = 0;
+                        newNotification[3] = "mention";
+                        newNotification[4] = tweetId;
+
+                        oldNotifications = usersNotifications[mentionedUsers[i]];
+
+                        if (!oldNotifications) {
+                            oldNotifications = [newNotification];
+                        } else {
+                            oldNotifications.push(newNotification)
+                        };
+
+                        //HASOWNPROPERTY CHECKS IF USER EXISTS, IF IT DOES. IT SENDS NOTIFICATION
+                        //CHECKS IF THE USER WHO WROTE THE TWEET IS MENTIONED, THEN NO NOTIFICATION WILL BE SEND.
+
+
+                        if (userData["userId"] === newNotification[0] ||
+                         !usersNotifications.hasOwnProperty(newNotification[0])) {
+
+                        } else {
+                        usersDB.child(newNotification[0]).child("notifications").set(oldNotifications);
+                        }
+                    }
+                }
 
                 this.cleanState(tweetData,tweetId)            
             })
