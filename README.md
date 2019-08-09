@@ -4,16 +4,17 @@
   
   <b>Features: </b>
   - Write and Send Tweet
+  - Mentions
+  - Notifications
   - Like/Dislike Tweet
   - Retweet
   - Search
   - Follow/Unfollow
   - Change Profile Picture
   - Change Cover Picture
+  - Delete Tweet
   
   <b>Future Changes:</b>
-  - Notifications
   - Direct Messages
   - Comment Tweet
-  - Mentions
-  - Edit/Delete Tweet
+  - Edit Tweet
